@@ -1,57 +1,10 @@
 require(plyr)
 require(data.table)
 require(dplyr)
-
-# load ukbb compiled data 
-ukbb = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_compiled_data_qc_filtered.Rdata")
-ukbb = data.frame(ukbb)
-
-fit = glm(ICD10_M06.Other.rheumatoid.arthritis ~ ICD10_F20.Schizophrenia + f.21022.0.0_Age.at.recruitment +  f.31.0.0_Sex +
-            risk*resilience + 
-            GenomeWidePC_1 + GenomeWidePC_2 + GenomeWidePC_3 + GenomeWidePC_4 + GenomeWidePC_5, data = ukbb, family=binomial())
-summary(fit)$coefficients
-interactions::interact_plot(fit, pred = 'risk', modx = 'resilience', data = ukbb)
-
-
-
-
-# groups based on self-reported ethicity 
-# groupings = c("100","200","300","400")
-counts = table(ukbb$f.21000.0.0)
-groupings = names(counts[counts >= 500])
-
-counts = colSums(ukbb[,grepl("ICD10_F|lupus|crohn|diabetes|asthma|Fibrosis.and.cirrhosis.of.liver", colnames(ukbb))])
-ids = names(counts[counts >= 500])
-
-ids = colnames(ukbb)[grepl("ICD", colnames(ukbb))]
-grab = ukbb[,ids]
-grab = data.frame(id = ukbb$IID, grab)
-colnames(grab) = gsub("ICD10_", "", colnames(grab))
-colnames(grab) = unlist(lapply(strsplit(colnames(grab), "[.]"), function(x) x[[1]]))
-
-require('comorbidity')
-grab$id = factor(grab$id  )
-melted = reshape2::melt(grab, .id='id')
-melted = melted[melted$value == 1, ]
-melted = melted[,colnames(melted) %in% c("id","variable")]
-
-elixhauser <- comorbidity(x = melted, id = "id", code = "variable", map = "elixhauser_icd10_quan", assign0 = FALSE)
-elixhauser$psycho = 0
-
-coscores = score(elixhauser, assign0 = FALSE, weights = 'swiss')
-coscores_unweighted = score(elixhauser, assign0 = FALSE, weights = NULL)
-
-coscores_df = data.frame(IID = elixhauser$id, comorbidity_score = coscores, comorbidity_score_unweighted = coscores_unweighted)
-
-missing_id = ukbb$IID[!ukbb$IID %in% coscores_df$IID]
-missing_df = data.frame(IID = missing_id, comorbidity_score = 0)
-all_scores = ldply(list(coscores_df, missing_df))
-
-ukbb = merge(ukbb, all_scores, by='IID')
-
-sub = ukbb
-
-rm(ukbb);
+ 
+# load UK BB compiled data
+sub = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_compiled_data_qc_filtered-w-comorbidity-score.Rdata")
+ 
 
 sub$dx = sub$ICD10_F20.Schizophrenia
 sub_id = sub[!is.na(sub$dx), ]

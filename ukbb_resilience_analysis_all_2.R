@@ -5,7 +5,7 @@ require(plyr);
 require(dplyr)
 
 # load ukbb compiled data 
-ukbb = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_compiled_data_qc_filtered.Rdata")
+ukbb = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_compiled_data_qc_filtered-w-comorbidity-score.Rdata")
 ukbb = data.frame(ukbb)
 
 showcase = data.frame(fread("/Users/jonathanhess/Documents/ukbiobank/phenotypes/Data_Dictionary_Showcase.tsv"))
@@ -13,7 +13,7 @@ showcase = showcase[grepl("mental", ignore.case = T, showcase$Path), ]
 showcase = showcase[grepl("Psychosocial factors", showcase$Path),]
 showcase = showcase[showcase$ValueType %in% "Categorical single",]
 showcase = showcase[grepl("ACE", showcase$Notes), ]
-showcase = showcase[showcase$Participants >= 200e3, ]
+showcase = showcase[showcase$Participants >= 400e3, ]
 range(showcase$Participants)
 
 showcase$iter = paste0("f.",showcase$FieldID,".0.0")
