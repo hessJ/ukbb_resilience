@@ -1,7 +1,8 @@
 require(plyr)
 require(data.table)
 require(dplyr)
- 
+require(interactions) 
+
 # load UK BB compiled data
 sub = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_compiled_data_qc_filtered-w-comorbidity-score.Rdata")
  
@@ -29,6 +30,10 @@ icd10_stats_f20 = data.frame(response = "ICD10_F20.Schizophrenia",
                                  pval = icd10_stats_f20$Pr...z..,
                                  n_sample =icd10_stats_f20$ntotal,
                                 n_case = icd10_stats_f20$ncase)
+
+int_plot_icd10_f20 = data.frame(interact_plot(fit, pred='risk',modx='resilience')$data)
+colnames(int_plot_icd10_f20)[colnames(int_plot_icd10_f20) %in% "dx"] = "outcome"
+int_plot_icd10_f20$response = 'icd10_scz'
  
 # repeat lifetime ICD code analysis using Elixhauser Comorbidity Index as additional covariates
 # ids = ids[!grepl("F20", ids)]
@@ -99,14 +104,15 @@ all_res_narrow = data.frame(   response = all_res_narrow$response,
                                  n_sample = all_res_narrow$ntotal,
                                  n_case = all_res_narrow$ncase)
  
+names(plot_save) = ids
+int_plot_icd10_narrow = ldply(plot_save, .id='response')
+colnames(int_plot_icd10_narrow)[colnames(int_plot_icd10_narrow) %in% "dx"] = "outcome"
 
 
 # == lifetime diagnoses in icd-10 chapters
 counts = colnames(sub)[grepl("ICD10", colnames(sub))]
 icd_no = gsub("ICD10_", "", unique(unlist(lapply(strsplit(counts, "[.]"), function(x) x[[1]]))))
 cat_grab = unique(gsub("\\d+", "", icd_no)) # remove numbers from character string
-
-# plot_int_combined = plot_int_combined[plot_int_combined$ICD10_F20.Schizophrenia == 0, ]
 
 coef_list = list();
 plot_list = list();
@@ -182,24 +188,40 @@ all_icd_broad = data.frame(   response = all_icd_broad$chapter,
                               n_sample = all_icd_broad$n_total,
                               n_case = all_icd_broad$n_case)
 
+names(plot_list) = cat_grab
+int_plot_icd10_broad = ldply(plot_list, .id='response')
+colnames(int_plot_icd10_broad)[colnames(int_plot_icd10_broad) %in% "disorders_icd"] = "outcome"
+int_plot_icd10_broad  = merge(chapters, int_plot_icd10_broad, by='response')
+int_plot_icd10_broad = int_plot_icd10_broad[,!colnames(int_plot_icd10_broad) %in% "response"]
+colnames(int_plot_icd10_broad)[colnames(int_plot_icd10_broad) %in% "chapter"] = "response"
+
 ## education
 grab = sub[!is.na(sub$isced_coding),]
 
-fit2 = lm(RNOmni::RankNorm(isced_coding) ~ ICD10_F20.Schizophrenia + f.21022.0.0_Age.at.recruitment + f.31.0.0_Sex +  risk*resilience +  GenomeWidePC_1 +
+fit2 = lm(RNOmni::RankNorm(isced_coding) ~ ICD10_F20.Schizophrenia + comorbidity_score + f.21022.0.0_Age.at.recruitment + f.31.0.0_Sex +  risk*resilience +  GenomeWidePC_1 +
             GenomeWidePC_2 + GenomeWidePC_3 + GenomeWidePC_4 + GenomeWidePC_5, data = grab)
 coef_educ = data.frame(summary(fit2)$coefficients)
 coef_educ$n_sample = nrow(grab)
 coef_educ
+
+int_plot_educ = data.frame(interactions::interact_plot(fit2, pred='risk',modx = 'resilience', data = grab)$data)
+int_plot_educ$response = 'education'
+colnames(int_plot_educ)[colnames(int_plot_educ) %in% "RNOmni..RankNorm.isced_coding."] = "outcome"
  
+
 ## fluid intelligence
 grab = sub[!is.na(sub$f.20016.0.0_Fluid.intelligence.score), ]
 
-fit = lm(scale(f.20016.0.0_Fluid.intelligence.score) ~ ICD10_F20.Schizophrenia + f.21022.0.0_Age.at.recruitment + f.31.0.0_Sex +  risk*resilience +  GenomeWidePC_1 +
+fit = lm(scale(f.20016.0.0_Fluid.intelligence.score) ~ ICD10_F20.Schizophrenia + comorbidity_score + f.21022.0.0_Age.at.recruitment + f.31.0.0_Sex +  risk*resilience +  GenomeWidePC_1 +
            GenomeWidePC_2 + GenomeWidePC_3 + GenomeWidePC_4 + GenomeWidePC_5, data = grab)
 coef_fluid = data.frame(summary(fit)$coefficients)
 coef_fluid$n_sample = nrow(grab)
 coef_fluid
- 
+
+int_plot_intel = data.frame(interactions::interact_plot(fit, pred='risk',modx = 'resilience', data = grab)$data)
+int_plot_intel$response = 'fluid_intelligence'
+colnames(int_plot_intel)[colnames(int_plot_intel) %in% "scale.f.20016.0.0_Fluid.intelligence.score."] = "outcome"
+
 
 coef_fluid = data.frame(pred = rownames(coef_fluid), coef_fluid)
 coef_educ = data.frame(pred = rownames(coef_educ), coef_educ)
@@ -221,6 +243,11 @@ all_stats_in_script = all_stats_in_script[grepl("risk|resilience", all_stats_in_
 all_stats_in_script = ddply(all_stats_in_script, .(pred, category), transform, fdr = p.adjust(pval, 'fdr'))
 ddply(all_stats_in_script, .(category, pred), summarize, sum(fdr < .05))
 
-fwrite(all_stats_in_script, file="~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/stats_compile_ukbb-1_resilience_0.2.txt", quote=F,row.names=F, sep="\t")
+saveRDS(all_stats_in_script, file="~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/ukbb_analysis_stats_combined_part-1.Rdata")
 
+# save all plot data into a single data frame
+all_plot = ldply(list(scz = int_plot_icd10_f20, icd10_narrow = int_plot_icd10_narrow, icd10_broad = int_plot_icd10_broad, 
+                      intelligence = int_plot_intel, education = int_plot_educ), .id='category')
+
+saveRDS(all_plot, file="~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_special-issue/draft/manuscript_docs/circulate/edits/final_to_submit/revision/plot_intteractions_ukbb_analysis_combine_part-1.Rdata")
 
