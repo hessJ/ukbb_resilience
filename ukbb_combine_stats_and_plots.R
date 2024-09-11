@@ -6,7 +6,8 @@ l2 = readRDS("~/Google Drive/mac_storage/Manuscripts/Resilience/scz/scz-bull_spe
 all = ldply(list(l1, l2))
 all$pred = gsub("risk:resilience","resilience:risk",all$pred)
 
-all = ddply(all, .(pred), transform, fdr = p.adjust(pval,'fdr'))
+# apply FDR correction to each X variable, per category
+all = ddply(all, .(pred, category), transform, fdr = p.adjust(pval,'fdr'))
 ddply(all, .(pred), summarize, sum(fdr < .05))
 
 c1 = all[all$pred %in% "resilience:risk",]
